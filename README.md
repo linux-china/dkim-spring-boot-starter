@@ -1,10 +1,10 @@
 dkim-spring-boot-starter
 ========================
-DKIM for Spring Boot Mail
+DKIM support for spring-boot-starter-mail.
 
 # Why DKIM?
 
-Make your email avoid blacklist.
+Avoid your sent email in spam folder.
 
 # How it works
 
@@ -25,7 +25,7 @@ Make your email avoid blacklist.
 
 * in application.properties, add following configuration
 ```
-dkim.signinDomain=demo.com
+dkim.signing-domain=demo.com
 dkim.selector=default
 dkim.privateKey=classpath:/rsa/demo.private.key.der
 ```
