@@ -1,10 +1,13 @@
 package org.mvnsearch.boot.dkim;
 
 import info.globalbus.dkim.DKIMSigner;
+import org.apache.commons.io.IOUtils;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
+import org.springframework.core.io.Resource;
 
 /**
  * DKIM email auto configuration
@@ -17,8 +20,10 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 public class DKIMAutoConfiguration {
 
     @Bean
-    public DKIMSigner dkimSigner(DKIMProperties properties) throws Exception {
-        return new DKIMSigner(properties.getSigningDomain(), properties.getSelector(), properties.getPrivateKey());
+    public DKIMSigner dkimSigner(DKIMProperties properties, ApplicationContext applicationContext) throws Exception {
+        Resource resource = applicationContext.getResource(properties.getPrivateKey());
+        byte[] rawKey = IOUtils.toByteArray(resource.getInputStream());
+        return new DKIMSigner(properties.getSigningDomain(), properties.getSelector(), rawKey);
     }
 
     @Bean
