@@ -13,7 +13,7 @@ Avoid your sent email in spam folder.
 
 ### How to use
 
-* Add :
+* Add following dependency in your pom.xml:
 
 ````xml
 <dependency>
