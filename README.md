@@ -35,25 +35,27 @@ dkim.privateKey=classpath:/rsa/demo.private.key.der
 
 a DKIM key setup:
 
-There are test keys in the keys/ directory but be aware to use those only for your tests.
+There are test keys in the src/test/resources/rsa/ directory but be aware to use those only for your tests.
 
 You need:
 
-a) a private key on your hard disc (e.g. in keys/); you can generate a new key by
+* a private key on your hard disc (e.g. in keys/); you can generate a new key by
 
+```
      openssl genrsa -out private.key.pem
+```
 
-DKIM for JavaMail needs the private key in DER format, you can transform a PEM key with openssl:
-
+* DKIM for JavaMail needs the private key in DER format, you can transform a PEM key with openssl:
+```
      openssl pkcs8 -topk8 -nocrypt -in private.key.pem -out private.key.der -outform der
-
-b) a public key in your DNS; here is a sample ressource record with selector "default": default._domainkey IN TXT "v=DKIM1; g=*; k=rsa; p=MIG...the_public_key_here...AQAB" (see http://www.ietf.org/rfc/rfc4871.txt for details)
-
+```
+* a public key in your DNS; here is a sample resource record with selector "default": default._domainkey IN TXT "v=DKIM1; g=*; k=rsa; p=MIG...the_public_key_here...AQAB" (see http://www.ietf.org/rfc/rfc4871.txt for details)
 You can use openssl to get a public key from the private key:
-
+```
       openssl rsa -inform PEM -in private.key.pem -pubout
+```
 
-# Reference
+# References
 
 * Mail Tester: https://www.mail-tester.com/
 * DKIM: http://www.dkim.org/
