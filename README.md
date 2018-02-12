@@ -17,7 +17,7 @@ Make your email avoid blacklist.
 
 ````xml
 <dependency>
-    <groupId>com.alibaba.boot</groupId>
+    <groupId>org.mvnsearch.boot</groupId>
     <artifactId>dkim-spring-boot-starter</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
