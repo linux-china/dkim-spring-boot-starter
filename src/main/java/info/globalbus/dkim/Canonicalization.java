@@ -22,7 +22,7 @@ package info.globalbus.dkim;
  * Provides Simple and Relaxed Canonicalization according to DKIM RFC 4871.
  *
  * @author Florian Sager, http://www.agitos.de, 22.11.2008
- * @author leijuan
+ * @author linux_china
  */
 public class Canonicalization {
 

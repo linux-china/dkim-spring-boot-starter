@@ -41,7 +41,7 @@ import java.util.stream.Collectors;
  * DKIM util
  *
  * @author Florian Sager, http://www.agitos.de, 22.11.2008
- * @author leijuan
+ * @author linux_china
  */
 public class DKIMUtil {
 

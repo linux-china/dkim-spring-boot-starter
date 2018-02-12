@@ -22,7 +22,7 @@ package info.globalbus.dkim;
  * DKIM signer Exception
  *
  * @author Florian Sager, http://www.agitos.de, 15.11.2008
- * @author leijuan
+ * @author linux_china
  */
 public class DKIMSignerException extends Exception {
 
