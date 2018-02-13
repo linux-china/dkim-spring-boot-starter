@@ -67,6 +67,10 @@ public class DKIMUtil {
         return matcher.matches();
     }
 
+    public static String defaultIfEmpty(String value, String defaultValue) {
+        return value == null || value.isEmpty() ? defaultValue : value;
+    }
+
     // FSTODO: converts to "platforms default encoding" might be wrong ?
     protected static String quotedPrintable(String s) {
         try (ByteArrayOutputStream boas = new ByteArrayOutputStream()) {
@@ -89,6 +93,10 @@ public class DKIMUtil {
         encoded = encoded.replace("\n", ""); // Linux+Win
         return encoded.replace("\r", ""); // Win --> FSTODO: select Encoder
         // without line termination
+    }
+
+    protected static byte[] base64Decode(String text) {
+        return Base64.getDecoder().decode(text.replaceAll("\\s+", ""));
     }
 
     public static PublicKey checkDNSForPublicKey(String signingDomain, String selector) throws DKIMSignerException {
@@ -173,9 +181,8 @@ public class DKIMUtil {
     public static PublicKey generateX509EncodedPublicKey(String publicKeyText) throws NoSuchAlgorithmException, InvalidKeySpecException {
         String[] lines = publicKeyText.split("\n");
         String rawKey = Stream.of(lines).filter(line -> !line.startsWith("---")).collect(Collectors.joining(""));
-        rawKey = rawKey.replaceAll("[^a-zA-Z\\d+/]*", "");
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(Base64.getDecoder().decode(rawKey));
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(base64Decode(rawKey));
         return keyFactory.generatePublic(keySpec);
     }
 
