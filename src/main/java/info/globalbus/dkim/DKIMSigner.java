@@ -47,7 +47,7 @@ public class DKIMSigner {
      */
     private static int MAX_HEADER_LENGTH = 67;
 
-    private static ArrayList<String> MINIMUM_HEADERS_TO_SIGN = new ArrayList<String>();
+    private static ArrayList<String> MINIMUM_HEADERS_TO_SIGN = new ArrayList<>();
     /**
      * default charset
      */
@@ -245,11 +245,11 @@ public class DKIMSigner {
         StringBuilder buf = new StringBuilder();
         while (true) {
             if (offset > 0 && s.substring(i).length() > MAX_HEADER_LENGTH - offset) {
-                buf.append(s.substring(i, i + MAX_HEADER_LENGTH - offset));
+                buf.append(s, i, i + MAX_HEADER_LENGTH - offset);
                 i += MAX_HEADER_LENGTH - offset;
                 offset = 0;
             } else if (s.substring(i).length() > MAX_HEADER_LENGTH) {
-                buf.append("\r\n\t").append(s.substring(i, i + MAX_HEADER_LENGTH));
+                buf.append("\r\n\t").append(s, i, i + MAX_HEADER_LENGTH);
                 i += MAX_HEADER_LENGTH;
             } else {
                 buf.append("\r\n\t").append(s.substring(i));
