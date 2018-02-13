@@ -32,12 +32,14 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * DKIM util
@@ -89,25 +91,25 @@ public class DKIMUtil {
         // without line termination
     }
 
-    public static boolean checkDNSForPublicKey(String signingDomain, String selector) throws DKIMSignerException {
+    public static PublicKey checkDNSForPublicKey(String signingDomain, String selector) throws DKIMSignerException {
         Hashtable<String, String> env = new Hashtable<>();
         env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
-        String recordname = selector + "._domainkey." + signingDomain;
+        String recordName = selector + "._domainkey." + signingDomain;
         String dnsDkimTextValue;
         try {
             DirContext dnsContext = new InitialDirContext(env);
-            javax.naming.directory.Attributes attribs = dnsContext.getAttributes(recordname, new String[]{"TXT"});
-            javax.naming.directory.Attribute txtrecord = attribs.get("txt");
-            if (txtrecord == null) {
-                throw new DKIMSignerException("There is no TXT record available for " + recordname);
+            javax.naming.directory.Attributes attributes = dnsContext.getAttributes(recordName, new String[]{"TXT"});
+            javax.naming.directory.Attribute txtRecord = attributes.get("txt");
+            if (txtRecord == null) {
+                throw new DKIMSignerException("There is no TXT record available for " + recordName);
             }
             // "v=DKIM1; g=*; k=rsa; p=MIGfMA0G ..."
-            dnsDkimTextValue = (String) txtrecord.get();
+            dnsDkimTextValue = (String) txtRecord.get();
         } catch (NamingException ne) {
             throw new DKIMSignerException("Selector lookup failed", ne);
         }
         if (dnsDkimTextValue == null) {
-            throw new DKIMSignerException("Value of RR " + recordname + " couldn't be retrieved");
+            throw new DKIMSignerException("Value of RR " + recordName + " couldn't be retrieved");
         }
         // try to read public key from RR
         String[] tags = dnsDkimTextValue.split(";");
@@ -116,26 +118,28 @@ public class DKIMUtil {
             if (tag.startsWith("p=")) {
                 try {
                     String publicKeyText = tag.substring(2);
-                    //remove illegal base64 characters
-                    publicKeyText = publicKeyText.replaceAll("[^a-zA-Z\\d+/]*", "");
-                    generatePublicKey(Base64.getDecoder().decode(publicKeyText));
+                    return generateX509EncodedPublicKey(publicKeyText);
                 } catch (NoSuchAlgorithmException nsae) {
                     throw new DKIMSignerException("RSA algorithm not found by JVM");
                 } catch (InvalidKeySpecException ikse) {
-                    throw new DKIMSignerException("The public key " + tag + " in RR " + recordname
+                    throw new DKIMSignerException("The public key " + tag + " in RR " + recordName
                             + " couldn't be decoded.");
                 }
-                // FSTODO: create test signature with privKey and test
+                // FSTODO: create test signature with private Key and test
                 // validation with pubKey to check on a valid key pair
-
-                return true;
             }
         }
-
-        throw new DKIMSignerException("No public key available in " + recordname);
+        throw new DKIMSignerException("No public key available in " + recordName);
     }
 
-
+    /**
+     * generate private key with pkcs8 encoded
+     *
+     * @param raw raw content
+     * @return private key
+     * @throws NoSuchAlgorithmException Algorithm exception
+     * @throws InvalidKeySpecException  invalid key spec exception
+     */
     public static PrivateKey generatePrivateKey(byte[] raw) throws NoSuchAlgorithmException, InvalidKeySpecException {
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
         // decode private key
@@ -143,10 +147,35 @@ public class DKIMUtil {
         return keyFactory.generatePrivate(keySpec);
     }
 
+    /**
+     * generate private key with pkcs8 encoded
+     *
+     * @param raw raw content
+     * @return public key
+     * @throws NoSuchAlgorithmException Algorithm exception
+     * @throws InvalidKeySpecException  invalid key spec exception
+     */
     public static PublicKey generatePublicKey(byte[] raw) throws NoSuchAlgorithmException, InvalidKeySpecException {
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
         // decode private key
         PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(raw);
+        return keyFactory.generatePublic(keySpec);
+    }
+
+    /**
+     * generate public key with X509 encoded
+     *
+     * @param publicKeyText public key text
+     * @return public key
+     * @throws NoSuchAlgorithmException Algorithm exception
+     * @throws InvalidKeySpecException  invalid key spec exception
+     */
+    public static PublicKey generateX509EncodedPublicKey(String publicKeyText) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        String[] lines = publicKeyText.split("\n");
+        String rawKey = Stream.of(lines).filter(line -> !line.startsWith("---")).collect(Collectors.joining(""));
+        rawKey = rawKey.replaceAll("[^a-zA-Z\\d+/]*", "");
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(Base64.getDecoder().decode(rawKey));
         return keyFactory.generatePublic(keySpec);
     }
 
