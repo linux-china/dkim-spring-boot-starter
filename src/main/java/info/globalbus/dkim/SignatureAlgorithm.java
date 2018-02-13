@@ -20,13 +20,13 @@
 package info.globalbus.dkim;
 
 /**
- * Allowed signing algorithms by DKIM RFC 4871 with translation to different Java notations
+ * Allowed signature algorithms by DKIM RFC 4871 with translation to different Java notations
  *
  * @author Florian Sager, http://www.agitos.de, 22.11.2008
  */
-public class SigningAlgorithm {
-    public static SigningAlgorithm SHA256withRSA = new SigningAlgorithm("rsa-sha256", "SHA256withRSA", "sha-256");
-    public static SigningAlgorithm SHA1withRSA = new SigningAlgorithm("rsa-sha1", "SHA1withRSA", "sha-1");
+public class SignatureAlgorithm {
+    public static SignatureAlgorithm SHA256withRSA = new SignatureAlgorithm("rsa-sha256", "SHA256withRSA", "sha-256");
+    public static SignatureAlgorithm SHA1withRSA = new SignatureAlgorithm("rsa-sha1", "SHA1withRSA", "sha-1");
 
     private String rfc4871Notation;
     private String javaSecNotation;
@@ -39,7 +39,7 @@ public class SigningAlgorithm {
      * @param javaSecNotation  java representation
      * @param javaHashNotation java hashing digest
      */
-    public SigningAlgorithm(String rfc4871Notation, String javaSecNotation, String javaHashNotation) {
+    public SignatureAlgorithm(String rfc4871Notation, String javaSecNotation, String javaHashNotation) {
         this.rfc4871Notation = rfc4871Notation;
         this.javaSecNotation = javaSecNotation;
         this.javaHashNotation = javaHashNotation;
@@ -55,5 +55,18 @@ public class SigningAlgorithm {
 
     public String getRfc4871Notation() {
         return this.rfc4871Notation;
+    }
+
+    public static SignatureAlgorithm getSignatureAlgorithm(String signatureName) {
+        switch (signatureName) {
+            case "SHA256withRSA":
+            case "rsa-sha256":
+                return SHA256withRSA;
+            case "SHA1withRSA":
+            case "rsa-sha1":
+                return SHA1withRSA;
+            default:
+                return null;
+        }
     }
 }
