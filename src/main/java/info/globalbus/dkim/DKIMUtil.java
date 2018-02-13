@@ -28,8 +28,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.X509EncodedKeySpec;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
 import java.util.Hashtable;
 import java.util.List;
@@ -116,10 +118,7 @@ public class DKIMUtil {
                     String publicKeyText = tag.substring(2);
                     //remove illegal base64 characters
                     publicKeyText = publicKeyText.replaceAll("[^a-zA-Z\\d+/]*", "");
-                    KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-                    // decode public key with x509
-                    X509EncodedKeySpec pubSpec = new X509EncodedKeySpec(Base64.getDecoder().decode(publicKeyText));
-                    keyFactory.generatePublic(pubSpec);
+                    generatePublicKey(Base64.getDecoder().decode(publicKeyText));
                 } catch (NoSuchAlgorithmException nsae) {
                     throw new DKIMSignerException("RSA algorithm not found by JVM");
                 } catch (InvalidKeySpecException ikse) {
@@ -134,6 +133,21 @@ public class DKIMUtil {
         }
 
         throw new DKIMSignerException("No public key available in " + recordname);
+    }
+
+
+    public static PrivateKey generatePrivateKey(byte[] raw) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        // decode private key
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(raw);
+        return keyFactory.generatePrivate(keySpec);
+    }
+
+    public static PublicKey generatePublicKey(byte[] raw) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        // decode private key
+        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(raw);
+        return keyFactory.generatePublic(keySpec);
     }
 
 
