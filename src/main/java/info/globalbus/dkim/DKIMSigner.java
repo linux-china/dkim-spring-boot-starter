@@ -25,13 +25,9 @@ import org.apache.commons.io.IOUtils;
 import javax.mail.MessagingException;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeUtility;
-import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
-import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.*;
 import java.util.Map.Entry;
 
@@ -52,6 +48,10 @@ public class DKIMSigner {
     private static int MAX_HEADER_LENGTH = 67;
 
     private static ArrayList<String> MINIMUM_HEADERS_TO_SIGN = new ArrayList<String>();
+    /**
+     * default charset
+     */
+    private static String DEFAULT_CHARSET = "utf-8";
 
     static {
         MINIMUM_HEADERS_TO_SIGN.add("From");
@@ -60,15 +60,15 @@ public class DKIMSigner {
     }
 
     private String[] defaultHeadersToSign = new String[]{"From", "To", "Subject", "Message-ID"};
-    //too much
-    private String[] defaultHeadersToSign2 = new String[]{"Content-Description", "Content-ID", "Content-Type",
+    //full headers
+    private String[] defaultFullHeadersToSign = new String[]{"Content-Description", "Content-ID", "Content-Type",
             "Content-Transfer-Encoding", "Cc", "Date", "From", "In-Reply-To", "List-Subscribe", "List-Post",
             "List-Owner", "List-Id", "List-Archive", "List-Help", "List-Unsubscribe", "MIME-Version", "Message-ID",
             "Resent-Sender", "Resent-Cc", "Resent-Date", "Resent-To", "Reply-To", "References", "Resent-Message-ID",
             "Resent-From", "Sender", "Subject", "To"};
 
     // use rsa-sha256 by default, see RFC 4871
-    private SigningAlgorithm signingAlgorithm = SigningAlgorithm.SHA256withRSA;
+    private SignatureAlgorithm signingAlgorithm = SignatureAlgorithm.SHA256withRSA;
     private Signature signatureService;
     private MessageDigest messageDigest;
     private String signingDomain;
@@ -85,19 +85,12 @@ public class DKIMSigner {
     }
 
     public DKIMSigner(String signingDomain, String selector, byte[] raw) throws Exception {
-        initDKIMSigner(signingDomain, selector, generatePrivateKey(raw));
+        initDKIMSigner(signingDomain, selector, DKIMUtil.generatePrivateKey(raw));
     }
 
     public DKIMSigner(String signingDomain, String selector, String privateKeyFileName) throws Exception {
         byte[] raw = IOUtils.toByteArray(new FileInputStream(privateKeyFileName));
-        initDKIMSigner(signingDomain, selector, generatePrivateKey(raw));
-    }
-
-    public PrivateKey generatePrivateKey(byte[] raw) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        // decode private key
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(raw);
-        return keyFactory.generatePrivate(keySpec);
+        initDKIMSigner(signingDomain, selector, DKIMUtil.generatePrivateKey(raw));
     }
 
     private void initDKIMSigner(String signingDomain, String selector, PrivateKey privateKey) throws DKIMSignerException {
@@ -193,11 +186,11 @@ public class DKIMSigner {
         this.zParam = param;
     }
 
-    public SigningAlgorithm getSigningAlgorithm() {
+    public SignatureAlgorithm getSigningAlgorithm() {
         return this.signingAlgorithm;
     }
 
-    public void setSigningAlgorithm(SigningAlgorithm signingAlgorithm) throws DKIMSignerException {
+    public void setSigningAlgorithm(SignatureAlgorithm signingAlgorithm) throws DKIMSignerException {
         try {
             this.messageDigest = MessageDigest.getInstance(signingAlgorithm.getJavaHashNotation());
         } catch (NoSuchAlgorithmException nsae) {
@@ -266,7 +259,17 @@ public class DKIMSigner {
         return buf.toString();
     }
 
+    /**
+     * sign MimeMessage and add DKIM-Signature header
+     *
+     * @param message mime message
+     * @return signature header value
+     * @throws DKIMSignerException dkim exception
+     * @throws MessagingException  message exception
+     * @throws IOException         IO Exception
+     */
     public String sign(MimeMessage message) throws DKIMSignerException, MessagingException, IOException {
+        String charset = DKIMUtil.defaultIfEmpty(message.getEncoding(), DEFAULT_CHARSET);
         Map<String, String> dkimSignature = new LinkedHashMap<>();
         dkimSignature.put("v", "1");
         dkimSignature.put("a", this.signingAlgorithm.getRfc4871Notation());
@@ -281,7 +284,6 @@ public class DKIMSigner {
             this.setIdentity(this.identity);
             dkimSignature.put("i", DKIMUtil.quotedPrintable(this.identity));
         }
-
         // process header
         @SuppressWarnings("unchecked")
         ArrayList<String> assureHeaders = (ArrayList<String>) MINIMUM_HEADERS_TO_SIGN.clone();
@@ -299,26 +301,21 @@ public class DKIMSigner {
             headerContent.append(this.headerCanonicalization.canonicalizeHeader(headerParts[0], headerParts[1]))
                     .append("\r\n");
             assureHeaders.remove(headerParts[0]);
-
             // add optional z= header list, DKIM-Quoted-Printable
             if (this.zParam) {
                 zParamString.append(headerParts[0]).append(":")
                         .append(DKIMUtil.quotedPrintable(headerParts[1].trim()).replace("|", "=7C")).append("|");
             }
         }
-
         if (!assureHeaders.isEmpty()) {
             throw new DKIMSignerException("Could not find the header fields "
                     + DKIMUtil.concatArray(assureHeaders, ", ") + " for signing");
         }
-
         dkimSignature.put("h", headerList.substring(0, headerList.length() - 1));
-
         if (this.zParam) {
             String zParamTemp = zParamString.toString();
             dkimSignature.put("z", zParamTemp.substring(0, zParamTemp.length() - 1));
         }
-
         // process body
         String body = getMessageBodyText(message);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -339,9 +336,8 @@ public class DKIMSigner {
         synchronized (this) {
             byte[] signedSignature;
             try {
-                this.signatureService.update(headerContent
-                        .append(this.headerCanonicalization.canonicalizeHeader(DKIM_SIGNATURE_HEADER, " "
-                                + serializedSignature)).toString().getBytes());
+                headerContent.append(this.headerCanonicalization.canonicalizeHeader(DKIM_SIGNATURE_HEADER, " " + serializedSignature));
+                this.signatureService.update(headerContent.toString().getBytes(charset));
                 signedSignature = this.signatureService.sign();
             } catch (SignatureException se) {
                 throw new DKIMSignerException("The signing operation by Java security failed", se);
@@ -351,7 +347,55 @@ public class DKIMSigner {
         }
     }
 
-    String getMessageBodyText(MimeMessage mimeMessage) throws MessagingException, IOException {
+    /**
+     * verify DKIM signature
+     *
+     * @param mimeMessage   mime message
+     * @param publicKeyText public key text
+     * @return legal DKIM signature or not
+     * @throws InvalidKeySpecException  invalid key spec exception
+     * @throws NoSuchAlgorithmException Algorithm exception
+     * @throws MessagingException       message exception
+     */
+    public boolean verify(MimeMessage mimeMessage, String publicKeyText) throws InvalidKeySpecException, NoSuchAlgorithmException, MessagingException, InvalidKeyException, SignatureException, UnsupportedEncodingException {
+        PublicKey publicKey = DKIMUtil.generateX509EncodedPublicKey(publicKeyText);
+        String[] dkimSignatureHeader = mimeMessage.getHeader(DKIM_SIGNATURE_HEADER);
+        if (dkimSignatureHeader != null && dkimSignatureHeader.length == 1) {
+            String charset = DKIMUtil.defaultIfEmpty(mimeMessage.getEncoding(), DEFAULT_CHARSET);
+            String dkimSignature = dkimSignatureHeader[0];
+            Map<String, String> dkimSignatureMap = parseSignatureValue(dkimSignature);
+            //signature
+            SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.getSignatureAlgorithm(dkimSignatureMap.get("a"));
+            if (signatureAlgorithm != null) {
+                final Signature sig = Signature.getInstance(signatureAlgorithm.getJavaSecNotation());
+                sig.initVerify(publicKey);
+                //header content
+                StringBuilder headerContent = new StringBuilder();
+                String signatureHeaderNames = dkimSignatureMap.get("h");
+                for (String header : signatureHeaderNames.split(":")) {
+                    headerContent.append(this.headerCanonicalization.canonicalizeHeader(header, mimeMessage.getHeader(header)[0]))
+                            .append("\r\n");
+                }
+                headerContent.append(headerCanonicalization.canonicalizeHeader(DKIM_SIGNATURE_HEADER, " " + dkimSignature.substring(0, dkimSignature.indexOf(dkimSignatureMap.get("b")))));
+                sig.update(headerContent.toString().getBytes(charset));
+                final byte[] signature = DKIMUtil.base64Decode(dkimSignatureMap.get("b"));
+                return sig.verify(signature);
+            }
+        }
+        return false;
+    }
+
+    public Map<String, String> parseSignatureValue(String value) {
+        Map<String, String> map = new HashMap<>();
+        String[] pairs = value.split(";\\s+");
+        for (String pair : pairs) {
+            String[] parts = pair.split("=");
+            map.put(parts[0], parts[1]);
+        }
+        return map;
+    }
+
+    private String getMessageBodyText(MimeMessage mimeMessage) throws MessagingException, IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         OutputStream osEncoding = MimeUtility.encode(bos, mimeMessage.getEncoding());
         mimeMessage.getDataHandler().writeTo(osEncoding);
