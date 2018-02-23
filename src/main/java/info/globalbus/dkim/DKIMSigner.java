@@ -354,7 +354,6 @@ public class DKIMSigner {
      * @param mimeMessage mime message
      * @param publicKey   public key text
      * @return legal DKIM signature or not
-     * @throws InvalidKeySpecException  invalid key spec exception
      * @throws NoSuchAlgorithmException Algorithm exception
      * @throws MessagingException       message exception
      */
