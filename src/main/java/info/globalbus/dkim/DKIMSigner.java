@@ -269,7 +269,7 @@ public class DKIMSigner {
      * @throws IOException         IO Exception
      */
     public String sign(MimeMessage message) throws DKIMSignerException, MessagingException, IOException {
-        String charset = DKIMUtil.defaultIfEmpty(message.getEncoding(), DEFAULT_CHARSET);
+        String charset = DKIMUtil.defaultIfEmpty(getCharset(message), DEFAULT_CHARSET);
         Map<String, String> dkimSignature = new LinkedHashMap<>();
         dkimSignature.put("v", "1");
         dkimSignature.put("a", this.signingAlgorithm.getRfc4871Notation());
@@ -360,8 +360,8 @@ public class DKIMSigner {
     public boolean verify(MimeMessage mimeMessage, String publicKeyText) throws InvalidKeySpecException, NoSuchAlgorithmException, MessagingException, InvalidKeyException, SignatureException, UnsupportedEncodingException {
         PublicKey publicKey = DKIMUtil.generateX509EncodedPublicKey(publicKeyText);
         String[] dkimSignatureHeader = mimeMessage.getHeader(DKIM_SIGNATURE_HEADER);
-        if (dkimSignatureHeader != null && dkimSignatureHeader.length == 1) {
-            String charset = DKIMUtil.defaultIfEmpty(mimeMessage.getEncoding(), DEFAULT_CHARSET);
+        if (dkimSignatureHeader != null && dkimSignatureHeader.length > 0) {
+            String charset = DKIMUtil.defaultIfEmpty(getCharset(mimeMessage), DEFAULT_CHARSET);
             String dkimSignature = dkimSignatureHeader[0];
             Map<String, String> dkimSignatureMap = parseSignatureValue(dkimSignature);
             //signature
@@ -373,11 +373,16 @@ public class DKIMSigner {
                 StringBuilder headerContent = new StringBuilder();
                 String signatureHeaderNames = dkimSignatureMap.get("h");
                 for (String header : signatureHeaderNames.split(":")) {
+                    header = header.trim();
                     headerContent.append(this.headerCanonicalization.canonicalizeHeader(header, mimeMessage.getHeader(header)[0]))
                             .append("\r\n");
                 }
                 headerContent.append(headerCanonicalization.canonicalizeHeader(DKIM_SIGNATURE_HEADER, " " + dkimSignature.substring(0, dkimSignature.indexOf(dkimSignatureMap.get("b")))));
-                sig.update(headerContent.toString().getBytes(charset));
+                try {
+                    sig.update(headerContent.toString().getBytes(charset));
+                } catch (Exception e) {
+                    sig.update(headerContent.toString().getBytes(DEFAULT_CHARSET));
+                }
                 final byte[] signature = DKIMUtil.base64Decode(dkimSignatureMap.get("b"));
                 return sig.verify(signature);
             }
@@ -401,5 +406,25 @@ public class DKIMSigner {
         mimeMessage.getDataHandler().writeTo(osEncoding);
         osEncoding.flush();
         return bos.toString();
+    }
+
+    /**
+     * get charset from mime message, ContentType -> Content-Transfer-Encoding -> utf-8
+     *
+     * @param mimeMessage mime message
+     * @return charset
+     */
+    public String getCharset(MimeMessage mimeMessage) {
+        try {
+            String contentType = mimeMessage.getContentType();
+            if (contentType != null && contentType.contains("charset=\"")) {
+                String charset = contentType.substring(contentType.indexOf("charset=\"") + 9);
+                charset = charset.substring(0, charset.indexOf("\""));
+                return charset;
+            }
+            return mimeMessage.getEncoding();
+        } catch (Exception e) {
+            return "utf-8";
+        }
     }
 }
