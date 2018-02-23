@@ -23,6 +23,7 @@ import com.sun.mail.util.CRLFOutputStream;
 import org.apache.commons.io.IOUtils;
 
 import javax.mail.MessagingException;
+import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeUtility;
 import java.io.*;
@@ -350,20 +351,26 @@ public class DKIMSigner {
     /**
      * verify DKIM signature
      *
-     * @param mimeMessage   mime message
-     * @param publicKeyText public key text
+     * @param mimeMessage mime message
+     * @param publicKey   public key text
      * @return legal DKIM signature or not
      * @throws InvalidKeySpecException  invalid key spec exception
      * @throws NoSuchAlgorithmException Algorithm exception
      * @throws MessagingException       message exception
      */
-    public boolean verify(MimeMessage mimeMessage, String publicKeyText) throws InvalidKeySpecException, NoSuchAlgorithmException, MessagingException, InvalidKeyException, SignatureException, UnsupportedEncodingException {
-        PublicKey publicKey = DKIMUtil.generateX509EncodedPublicKey(publicKeyText);
+    public boolean verify(MimeMessage mimeMessage, PublicKey publicKey) throws NoSuchAlgorithmException, MessagingException, InvalidKeyException, SignatureException, UnsupportedEncodingException, DKIMSignerException {
         String[] dkimSignatureHeader = mimeMessage.getHeader(DKIM_SIGNATURE_HEADER);
         if (dkimSignatureHeader != null && dkimSignatureHeader.length > 0) {
             String charset = DKIMUtil.defaultIfEmpty(getCharset(mimeMessage), DEFAULT_CHARSET);
             String dkimSignature = dkimSignatureHeader[0];
             Map<String, String> dkimSignatureMap = parseSignatureValue(dkimSignature);
+            //public key from domain
+            if (publicKey == null) {
+                String selector = dkimSignatureMap.get("s");
+                String senderEmail = ((InternetAddress) mimeMessage.getFrom()[0]).getAddress();
+                String domain = senderEmail.substring(senderEmail.lastIndexOf("@") + 1);
+                publicKey = DKIMUtil.checkDNSForPublicKey(domain, selector);
+            }
             //signature
             SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.getSignatureAlgorithm(dkimSignatureMap.get("a"));
             if (signatureAlgorithm != null) {

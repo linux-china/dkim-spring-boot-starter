@@ -1,6 +1,7 @@
 package org.mvnsearch.boot.dkim.demo;
 
 import info.globalbus.dkim.DKIMSigner;
+import info.globalbus.dkim.DKIMUtil;
 import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -50,7 +51,7 @@ public class MailDemoApplicationTests {
         MimeMessage receivedMessage = wiserMessage.getMimeMessage();
         Assert.assertNotNull(receivedMessage.getHeader("DKIM-Signature"));
         String publicKeyText = IOUtils.toString(this.getClass().getResourceAsStream("/rsa/demo.public.key.txt"), "utf-8");
-        Assert.assertTrue(dkimSigner.verify(receivedMessage, publicKeyText));
+        Assert.assertTrue(dkimSigner.verify(receivedMessage, DKIMUtil.generateX509EncodedPublicKey(publicKeyText)));
     }
 
 
