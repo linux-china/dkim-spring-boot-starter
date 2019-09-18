@@ -61,3 +61,4 @@ You can use openssl to get a public key from the private key:
 * DKIM: http://www.dkim.org/
 * 28 Tips To Avoid Spam Filters When Doing Email Marketing: https://monk.webengage.com/how-to-avoid-spam-filters-when-sending-emails/
 * DKIM for Java: https://github.com/globalbus/dkim
+* Configuring and Managing SPF, DKIM, and DMARC: https://app.pluralsight.com/library/courses/configuring-managing-spf-dkim-dmarc/table-of-contents
